@@ -1,0 +1,6 @@
+__pycache__/
+knowledge_base/
+venv/
+./kcc_tamil_nadu.csv
+rag_index_chunks.pkl
+rag_index_index.faiss
