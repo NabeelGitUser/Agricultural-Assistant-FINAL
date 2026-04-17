@@ -5,7 +5,7 @@ Interactive RAG Query Interface for Ollama Models
 from rag_pipeline_ollama import DocumentLoader, TextChunker, VectorStore, OllamaRAG
 import argparse
 
-
+    
 def build_knowledge_base(docs_dir: str, index_path: str, embedding_model: str):
     """Build and save the knowledge base"""
     print("Building knowledge base...")
