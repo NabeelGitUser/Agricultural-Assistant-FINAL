@@ -227,58 +227,170 @@ class OllamaRAG:
     def generate_prompt(self, query: str, context_chunks: List[Dict[str, Any]]) -> str:
         """Create prompt with retrieved context"""
         context = "\n\n".join([
-            f"[Source: {chunk['chunk']['source']}]\n{chunk['chunk']['content']}"
+            f"{chunk['chunk']['content']}"
             for chunk in context_chunks
         ])
-        
-        # Detect language
+
         tamil_chars = set('அஆஇஈஉஊஎஏஐஒஓஔகசடதநபமயரலவழளறனஜஷஸஹ')
         is_tamil = any(char in tamil_chars for char in query)
-        
+
         if is_tamil:
-            prompt = f"""நீங்கள் ஒரு விவசாய உதவியாளர். கீழே உள்ள தகவல்களை பயன்படுத்தி தமிழில் மட்டும் பதில் சொல்லுங்கள்.
+            prompt = f"""நீங்கள் ஒரு விவசாய நிபுணர். கீழே உள்ள தகவல்களை பயன்படுத்தி தமிழில் மட்டும் 3-4 வரிகளில் பதில் சொல்லுங்கள்.
 
-        தகவல்:
-        {context}
+    தகவல்கள்:
+    {context}
 
-        கேள்வி: {query}
+    கேள்வி: {query}
 
-        தமிழில் பதில்:"""
+    தமிழில் பதில்:"""
+
         else:
-            # Strip Tamil from context for English questions
-            import re
-            # Remove Tamil characters from context
-            clean_context = re.sub(r'[\u0B80-\u0BFF]+', '[Tamil content - translate to English]', context)
-    
-            prompt = f"""You are an agricultural assistant. Answer in English only.
+            prompt = f"""You are an expert agricultural assistant for Tamil Nadu farmers.
+    Use the context below to answer in clear English in 3-4 lines.
+    If context is not enough, use your own agricultural knowledge.
 
-        Context:
-        {clean_context}
+    Context:
+    {context}
 
-        Question: {query}
+    Question: {query}
 
-        English Answer:"""
-        
+    Answer:"""
+
         return prompt
-    
-    def query(
-        self,
-        question: str,
-        k: int = 3,
-        temperature: float = 0.1,
-        max_tokens: int = 512
-    ) -> Dict[str, Any]:
+
+    def detect_language(self, text: str) -> str:
+        """Detect if text is English, Tamil, or Tanglish"""
+        tamil_chars = set('அஆஇஈஉஊஎஏஐஒஓஔகசடதநபமயரலவழளறனஜஷஸஹ')
+        
+        # Check for Tamil script
+        if any(char in tamil_chars for char in text):
+            return 'tamil'
+        
+        # Tanglish keywords commonly used by Tamil farmers
+        tanglish_words = [
+            'payiru', 'vivasayam', 'nela', 'tharai', 'virai',
+            'maram', 'poo', 'keerai', 'thakkali', 'vengayam',
+            'uram', 'marundu', 'puchi', 'noi', 'mazhai',
+            'saagubadi', 'neer', 'thanni', 'vithai', 'அடம்',
+            'eppadi', 'yenna', 'enna', 'enga', 'inge',
+            'padam', 'elai', 'vazhaipazham', 'nelam',
+            'kollu', 'kambu', 'ragi', 'ulundu', 'kadala',
+            'pattani', 'mochai', 'sundakkai', 'kathari',
+            'poosanikai', 'peerkangai', 'kovakkai', 'murungai',
+            'illai', 'vaeru', 'thol', 'kai', 'pazham',
+            'vangi', 'melam', 'kirukku', 'varattam'
+        ]
+        
+        text_lower = text.lower()
+        if any(word in text_lower for word in tanglish_words):
+            return 'tanglish'
+        
+        return 'english'
+
+    def translate_tanglish_to_english(self, text: str) -> str:
+        """Translate Tanglish to English using Ollama"""
+        try:
+            response = requests.post(
+                f"{self.ollama_url}/api/generate",
+                json={
+                    "model": self.model_name,
+                    "prompt": f"""You are a Tamil-English translator. 
+    The following is a question written in Tanglish (Tamil language typed using English letters).
+    Translate it accurately to English. 
+
+    Common Tanglish words reference:
+    - vazhai/vaazhai = banana
+    - mann/man = soil
+    - nalla = good/best
+    - enna = what
+    - irukum = is/will be
+    - payiru = crop/plant
+    - uram = fertilizer
+    - neer/thanni = water
+    - puchi = insect/pest
+    - noi = disease
+    - maram = tree
+    - vithai = seed
+    - vivasayam = agriculture
+    - saagubadi = cultivation
+
+    Tanglish question: "{text}"
+
+    Translate to English (only output the translation):""",
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.1,
+                        "num_predict": 100
+                    }
+                }
+            )
+            if response.status_code == 200:
+                translated = response.json().get('response', text).strip()
+                print(f"Tanglish detected! Translated: '{text}' → '{translated}'")
+                return translated
+        except:
+            pass
+        return text
+
+    def translate_to_english(self, text: str) -> str:
+        """Translate Tamil text to English using Ollama"""
+        tamil_chars = set('அஆஇஈஉஊஎஏஐஒஓஔகசடதநபமயரலவழளறனஜஷஸஹ')
+        has_tamil = any(char in tamil_chars for char in text)
+        
+        if not has_tamil:
+            return text
+        
+        try:
+            response = requests.post(
+                f"{self.ollama_url}/api/generate",
+                json={
+                    "model": self.model_name,
+                    "prompt": f"Translate this Tamil agricultural text to English. Only output the translation, nothing else:\n\n{text}",
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.1,
+                        "num_predict": 300
+                    }
+                }
+            )
+            if response.status_code == 200:
+                return response.json().get('response', text).strip()
+        except:
+            pass
+        return text
+
+    def query(self, question: str, k: int = 3, temperature: float = 0.7, max_tokens: int = 512) -> Dict[str, Any]:
         """Query the RAG system"""
-        # Retrieve relevant chunks
-        print(f"Retrieving top {k} relevant chunks...")
-        retrieved_chunks = self.vector_store.search(question, k=k)
         
+        # Detect language
+        lang = self.detect_language(question)
+        print(f"Detected language: {lang}")
+        
+        # Store original question for response
+        original_question = question
+        
+        # If Tanglish, translate to English for better RAG search
+        search_question = question
+        if lang == 'tanglish':
+            search_question = self.translate_tanglish_to_english(question)
+            print(f"Using translated question for search: {search_question}")
+
+        # Retrieve relevant chunks using translated question
+        retrieved_chunks = self.vector_store.search(search_question, k=k)
+
+        # If English or Tanglish question, translate Tamil chunks to English
+        if lang in ['english', 'tanglish']:
+            print("Translating Tamil context to English...")
+            for chunk in retrieved_chunks:
+                chunk['chunk']['content'] = self.translate_to_english(
+                    chunk['chunk']['content']
+                )
+
         # Generate prompt
-        prompt = self.generate_prompt(question, retrieved_chunks)
-        
-        # Generate response using Ollama API
-        print(f"Generating response with {self.model_name}...")
-        
+        prompt = self.generate_prompt_with_lang(
+            original_question, search_question, retrieved_chunks, lang
+        )
+
         try:
             response = requests.post(
                 f"{self.ollama_url}/api/generate",
@@ -292,22 +404,64 @@ class OllamaRAG:
                     }
                 }
             )
-            
             if response.status_code == 200:
-                result = response.json()
-                answer = result.get('response', '').strip()
+                answer = response.json().get('response', '').strip()
             else:
-                answer = f"Error: Ollama returned status code {response.status_code}"
-                
+                answer = f"Error: {response.status_code}"
+
         except Exception as e:
-            answer = f"Error generating response: {e}"
-        
+            answer = f"Error: {e}"
+
         return {
-            'question': question,
+            'question': original_question,
             'answer': answer,
             'sources': [chunk['chunk']['source'] for chunk in retrieved_chunks],
             'retrieved_chunks': retrieved_chunks
         }
+    
+    def generate_prompt_with_lang(self, original_question: str, search_question: str, context_chunks: List[Dict[str, Any]], lang: str) -> str:
+        """Create prompt based on detected language"""
+        context = "\n\n".join([
+            f"{chunk['chunk']['content']}"
+            for chunk in context_chunks
+        ])
+
+        if lang == 'tamil':
+            prompt = f"""நீங்கள் ஒரு விவசாய நிபுணர். கீழே உள்ள தகவல்களை பயன்படுத்தி தமிழில் மட்டும் 3-4 வரிகளில் பதில் சொல்லுங்கள்.
+
+    தகவல்கள்:
+    {context}
+
+    கேள்வி: {original_question}
+
+    தமிழில் பதில்:"""
+
+        elif lang == 'tanglish':
+            prompt = f"""You are an expert agricultural assistant for Tamil Nadu farmers.
+    The farmer asked in Tanglish: "{original_question}"
+    This means: "{search_question}"
+
+    Use the context below and answer in Tamil language (Tamil script) in 3-4 lines.
+    The farmer understands Tamil so reply in Tamil script.
+
+    Context:
+    {context}
+
+    Tamil Answer:"""
+
+        else:  # English
+            prompt = f"""You are an expert agricultural assistant for Tamil Nadu farmers.
+    Use the context below to answer in clear English in 3-4 lines.
+    If context is not enough, use your own agricultural knowledge.
+
+    Context:
+    {context}
+
+    Question: {original_question}
+
+    Answer:"""
+
+        return prompt
 
 
 def main():
