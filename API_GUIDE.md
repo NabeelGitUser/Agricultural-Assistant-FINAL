@@ -30,7 +30,7 @@ curl -X POST "http://localhost:8000/chat" \
   -d '{
     "question": "What are the main topics in the documents?",
     "k": 3,
-    "temperature": 0.7,
+    "temperature": 0.1,
     "max_tokens": 512
   }'
 ```
@@ -42,7 +42,7 @@ import requests
 response = requests.post("http://localhost:8000/chat", json={
     "question": "What is the main topic?",
     "k": 3,
-    "temperature": 0.7,
+    "temperature": 0.1,
     "max_tokens": 512
 })
 

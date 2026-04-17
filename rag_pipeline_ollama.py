@@ -9,6 +9,7 @@ from typing import List, Dict, Any
 from pathlib import Path
 import requests
 import json
+import torch
 
 # Document processing
 import PyPDF2
@@ -126,7 +127,9 @@ class VectorStore:
     """FAISS-based vector store for efficient similarity search"""
     
     def __init__(self, embedding_model_name: str = 'all-MiniLM-L6-v2'):
-        self.embedding_model = SentenceTransformer(embedding_model_name)
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print(f"🚀 Embedding model using: {device}")
+        self.embedding_model = SentenceTransformer(embedding_model_name, device=device)
         self.index = None
         self.chunks = []
         self.dimension = None
@@ -228,14 +231,33 @@ class OllamaRAG:
             for chunk in context_chunks
         ])
         
-        prompt = f"""Based on the following context from the documents, please answer the question accurately.
+        # Detect language
+        tamil_chars = set('அஆஇஈஉஊஎஏஐஒஓஔகசடதநபமயரலவழளறனஜஷஸஹ')
+        is_tamil = any(char in tamil_chars for char in query)
+        
+        if is_tamil:
+            prompt = f"""நீங்கள் ஒரு விவசாய உதவியாளர். கீழே உள்ள தகவல்களை பயன்படுத்தி தமிழில் மட்டும் பதில் சொல்லுங்கள்.
 
-Context:
-{context}
+        தகவல்:
+        {context}
 
-Question: {query}
+        கேள்வி: {query}
 
-Answer:"""
+        தமிழில் பதில்:"""
+        else:
+            # Strip Tamil from context for English questions
+            import re
+            # Remove Tamil characters from context
+            clean_context = re.sub(r'[\u0B80-\u0BFF]+', '[Tamil content - translate to English]', context)
+    
+            prompt = f"""You are an agricultural assistant. Answer in English only.
+
+        Context:
+        {clean_context}
+
+        Question: {query}
+
+        English Answer:"""
         
         return prompt
     
@@ -243,7 +265,7 @@ Answer:"""
         self,
         question: str,
         k: int = 3,
-        temperature: float = 0.7,
+        temperature: float = 0.1,
         max_tokens: int = 512
     ) -> Dict[str, Any]:
         """Query the RAG system"""

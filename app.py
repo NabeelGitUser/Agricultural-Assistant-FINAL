@@ -63,7 +63,7 @@ is_initialized = False
 class ChatRequest(BaseModel):
     question: str = Field(..., description="Question to ask the RAG system")
     k: int = Field(3, ge=1, le=10, description="Number of context chunks to retrieve")
-    temperature: float = Field(0.7, ge=0.0, le=2.0, description="Model temperature")
+    temperature: float = Field(0.1, ge=0.0, le=2.0, description="Model temperature")
     max_tokens: int = Field(512, ge=50, le=2048, description="Maximum tokens to generate")
 
 class ChatResponse(BaseModel):
@@ -526,4 +526,4 @@ if __name__ == "__main__":
     print(f"📊 Docs: http://localhost:8000/docs")
     print("=" * 60)
     
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")

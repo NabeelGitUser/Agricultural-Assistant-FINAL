@@ -108,7 +108,7 @@ def test_chat():
             json={
                 "question": question,
                 "k": 3,
-                "temperature": 0.7,
+                "temperature": 0.1,
                 "max_tokens": 256
             }
         )

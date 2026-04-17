@@ -134,7 +134,7 @@ print(f"Sources: {result['sources']}")
 
 ### Query Parameters
 - `k`: Number of chunks to retrieve (default: 3)
-- `temperature`: Sampling temperature (default: 0.7)
+- `temperature`: Sampling temperature (default: 0.1)
 - `max_tokens`: Maximum tokens in response (default: 512)
 
 ## Performance Recommendations
